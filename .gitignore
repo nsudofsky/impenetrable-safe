@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+.cache/
+tools/board_secrets.py
+finger_lock/laptop/data_v1/

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finger Lock</title>
+<style>
+  :root {
+    --bg: #f4f1ec; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3ded6;
+    --red: #d6283b; --green: #1f9d55; --amber: #c98a00; --btn: #1d1d1f; --btn-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141416; --card: #1f1f23; --ink: #f2f2f4; --muted: #9a9aa2; --line: #2e2e34;
+      --btn: #f2f2f4; --btn-ink: #141416;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+  h1 span { width: 12px; height: 12px; border-radius: 3px; background: var(--red); display: inline-block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .status { text-align: center; }
+  .icon { font-size: 56px; line-height: 1; }
+  .state { font-size: 24px; font-weight: 650; margin-top: 8px; }
+  .hint { color: var(--muted); margin-top: 4px; min-height: 1.4em; }
+  .prompt { font-size: 20px; font-weight: 650; margin-top: 10px; min-height: 1.4em; }
+  .prompt.away { color: #fff; background: var(--amber); border-radius: 10px; padding: 8px 10px; }
+  .slots { display: flex; justify-content: center; gap: 14px; margin: 16px 0 4px; }
+  .slot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--muted); }
+  .slot.on { background: var(--ink); border-color: var(--ink); }
+  .pcts { display: flex; justify-content: center; gap: 14px; font-size: 12px; color: var(--muted); }
+  .pcts span { width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+  .reading { margin-top: 14px; text-align: left; }
+  .reading .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; position: relative; }
+  .bar div { height: 100%; width: 0; background: var(--amber); transition: width .25s; }
+  .bar div.sure { background: var(--green); }
+  .lead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .lead b { font-size: 44px; line-height: 1; min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+  .lead small { color: var(--muted); }
+  .switch { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .bar .mark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .5; }
+  .locked .state { color: var(--red); }
+  .listening .state { color: var(--amber); }
+  .unlocked .state { color: var(--green); }
+  .status.lockout { background: var(--red); border-color: var(--red); color: #fff; }
+  .status.lockout .state { color: #fff; font-size: 34px; letter-spacing: .06em; }
+  .status.lockout .hint { color: #fff; }
+  .countdown { font-size: 64px; font-weight: 750; line-height: 1; margin-top: 10px; display: none;
+               font-variant-numeric: tabular-nums; }
+  .status.lockout .countdown { display: block; }
+  img { width: 100%; border-radius: 10px; display: block; background: #000; aspect-ratio: 4 / 3; object-fit: cover; }
+  .label { color: var(--muted); font-size: 13px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 12px 18px; cursor: pointer;
+           background: var(--btn); color: var(--btn-ink); width: 100%; }
+  button:disabled { opacity: .35; cursor: default; }
+  .pick { display: flex; gap: 10px; margin: 10px 0 14px; }
+  .pick select { flex: 1; font: inherit; font-size: 22px; text-align: center; padding: 10px; border-radius: 10px;
+                 border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .msg { margin-top: 10px; min-height: 1.4em; color: var(--muted); }
+  .msg.good { color: var(--green); } .msg.bad { color: var(--red); }
+  .foot { color: var(--muted); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span></span>Finger Lock</h1>
+
+  <section class="card status locked" id="status">
+    <div class="icon" id="icon">🔒</div>
+    <div class="state" id="state">Locked</div>
+    <div class="countdown" id="countdown"></div>
+    <div class="prompt" id="prompt"></div>
+    <div class="hint" id="hint"></div>
+    <div class="slots" id="slots"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div>
+    <div class="pcts" id="pcts"><span></span><span></span><span></span></div>
+    <div class="reading" id="reading">
+      <div class="lead" id="lead"><b id="leadNum">–</b><small>number it's leaning toward</small></div>
+      <div class="row"><span id="readLabel">Reading your hand</span><span id="readPct"></span></div>
+      <div class="bar"><div id="readBar"></div><span class="mark" id="readMark" style="left: 65%"></span></div>
+      <div class="row" style="margin-top: 6px"><span id="readVotes"></span><span>line = needed to accept</span></div>
+      <label class="switch"><input type="checkbox" id="showLead"> Show the number being read (off = keep the code private)</label>
+    </div>
+  </section>
+
+  <section class="card">
+    <button id="action">Start</button>
+  </section>
+
+  <section class="card">
+    <div class="label">Camera</div>
+    <img id="cam" alt="Live view of the red square">
+  </section>
+
+  <section class="card">
+    <div class="label">Who's using it?</div>
+    <div class="pick">
+      <input id="who" placeholder="Name (blank = Tasha)" maxlength="30"
+             style="flex: 1; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);">
+      <button id="saveWho" style="width: auto;">Set</button>
+    </div>
+    <div class="hint" id="whoNow"></div>
+  </section>
+
+  <section class="card">
+    <div class="label">Change the code</div>
+    <div id="codeHint" class="hint">Open the safe first, then you can set a new code.</div>
+    <div class="pick">
+      <select id="d0"></select><select id="d1"></select><select id="d2"></select>
+    </div>
+    <button id="save" disabled>Save new code</button>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <p class="foot">The UNO Q reads the fingers itself (trained net on the board). Don't also run <code>lock_app.py</code>.</p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let mode = "locked";
+
+// Remember the "show the number" choice in this browser (on by default).
+let showLead = true;
+try { showLead = localStorage.getItem("showLead") !== "off"; } catch (e) {}
+$("showLead").checked = showLead;
+$("showLead").onchange = () => {
+  showLead = $("showLead").checked;
+  try { localStorage.setItem("showLead", showLead ? "on" : "off"); } catch (e) {}
+};
+
+for (const id of ["d0", "d1", "d2"])
+  for (let n = 1; n <= 5; n++) $(id).add(new Option(n, n));
+
+async function post(path) {
+  const r = await fetch(path, { method: "POST" });
+  return r.json();
+}
+
+function show(s) {
+  mode = s.mode;
+  const left = s.tries_left, tries = n => n + (n === 1 ? " try" : " tries");
+  const lockedHint =
+      s.lockout_seconds ? "3 wrong codes in a row. Wait for the countdown, then try again."
+    : s.last === "wrong" ? `Wrong code. ${tries(left)} left before a ${s.lockout_length}-second lockout.`
+    : "Press the button or Start.";
+  const look = {
+    locked:    s.lockout_seconds ? ["⛔", "LOCKED OUT", lockedHint] : ["🔒", "Locked", lockedHint],
+    listening: ["✋", "Enter the code", "Show each number in the red square, hand out between numbers."
+                + (left < 3 ? ` (${tries(left)} left)` : "")],
+    unlocked:  ["🔓", "Open",    "Close the lid, then lock it."],
+  }[mode];
+  $("status").className = "card status " + mode + (s.lockout_seconds ? " lockout" : "");
+  $("countdown").textContent = s.lockout_seconds || "";
+  $("whoNow").textContent = "Now testing: " + (s.tester || "Tasha (default)") +
+                            ". Attempts and corrections are saved under this name.";
+
+  // What to do right now, from the laptop's lock policy.
+  const r0 = s.reading, nth = Math.min(s.entered + 1, 3);
+  const prompts = {
+    show: `Show number ${nth} of 3`,
+    settle: "Hold it there...",
+    reading: "Reading... move your hand a little",
+    away: "Take your hand out of the square",
+  };
+  const phase = mode === "listening" && r0 ? r0.phase : "";
+  $("prompt").textContent = mode === "listening" ? (prompts[phase] || (s.entered >= 3 ? "Checking the code..." : `Show number ${nth} of 3`)) : "";
+  $("prompt").className = "prompt" + (phase === "away" ? " away" : "");
+  [$("icon").textContent, $("state").textContent, $("hint").textContent] = look;
+  [...$("slots").children].forEach((el, i) => el.classList.toggle("on", mode === "listening" && i < s.entered));
+  $("slots").style.visibility = mode === "listening" ? "visible" : "hidden";
+
+  // How sure the net was of each accepted number (the numbers themselves stay secret).
+  const conf = s.confidences || [];
+  [...$("pcts").children].forEach((el, i) => el.textContent = i < conf.length ? Math.round(conf[i] * 100) + "%" : "");
+
+  // The running vote while a hand is in the square.
+  const r = s.reading;
+  $("reading").style.display = mode === "listening" ? "block" : "none";
+  const pct = r && r.votes ? Math.round(r.conf * 100) : 0;
+  $("readBar").style.width = pct + "%";
+  const need = r && r.sure ? Math.round(r.sure * 100) : 65;
+  $("readMark").style.left = need + "%";
+  $("readBar").classList.toggle("sure", pct >= need);
+  $("readPct").textContent = r && r.votes ? pct + "% sure" : "";
+  $("lead").style.display = showLead ? "flex" : "none";
+  $("leadNum").textContent = r && r.votes && r.lead ? r.lead : "–";
+  $("readVotes").textContent = r && r.votes ? `looked ${r.votes.toFixed(1)} of ${r.of} s` : "Waiting for a hand in the square";
+
+  $("action").textContent = s.lockout_seconds ? `Locked out (${s.lockout_seconds} s)`
+                         : mode === "unlocked" ? "Lock" : mode === "listening" ? "Start over" : "Start";
+  $("action").disabled = !!s.lockout_seconds;
+  const open = mode === "unlocked";
+  $("save").disabled = !open;
+  for (const id of ["d0", "d1", "d2"]) $(id).disabled = !open;
+  $("codeHint").textContent = open ? "Pick 3 numbers (1-5), save, then lock and try it."
+                                   : "Open the safe first, then you can set a new code.";
+}
+
+$("saveWho").onclick = async () => {
+  show(await post("/tester?name=" + encodeURIComponent($("who").value.trim())));
+};
+$("who").onkeydown = e => { if (e.key === "Enter") $("saveWho").onclick(); };
+
+$("action").onclick = async () => show(await post(mode === "unlocked" ? "/lock" : "/start"));
+
+$("save").onclick = async () => {
+  const code = $("d0").value + $("d1").value + $("d2").value;
+  const r = await post("/passcode?code=" + code);
+  $("msg").className = "msg " + (r.ok ? "good" : "bad");
+  $("msg").textContent = r.ok ? "Saved. Lock the safe and try your new code." : r.why;
+  show(r);
+};
+
+// Ask for the status again as soon as the last answer arrives (never more than one at a time).
+async function tick() {
+  try { show(await (await fetch("/state")).json()); } catch (e) { $("hint").textContent = "Can't reach the safe..."; }
+  setTimeout(tick, 150);
+}
+tick();
+
+// Camera: a small picture, and the next one only once the last has loaded, so they never pile up.
+$("cam").onload = $("cam").onerror = () => setTimeout(() => { $("cam").src = "/frame.jpg?small=1&t=" + Date.now(); }, 150);
+$("cam").src = "/frame.jpg?small=1&t=" + Date.now();
+</script>
+</body>
+</html>

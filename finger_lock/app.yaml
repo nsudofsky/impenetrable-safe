@@ -1,0 +1,11 @@
+# app.yaml: The main configuration file for your Arduino App.
+
+name: Finger Lock
+
+description: "Safe that unlocks when you show the right 3-number finger code to the camera"
+
+icon: 🔒
+
+ports: [8000]
+
+bricks: []
